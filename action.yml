@@ -1,0 +1,88 @@
+name: Sonarcloud Analyse
+description: 'This action is used to analyse Maven project using Sonarcloud'
+author: 'eXo Platform'
+inputs:
+  maven_version:
+    description: Maven version
+    default: "3.9.9"
+    required: false
+  extra_maven_opts:
+    description: Extra Maven OPTS
+    required: false
+  jdk_major_version:
+    description: JDK Major version (eg 8, 11, 14, 17, 21,...)
+    default: "17"
+    required: false
+  jdk_distribution:
+    description: OpenJDK Adopted Distribution (temurin, zulu, adopt, liberica,...)
+    default: "zulu"
+    required: false
+  maximize_build_space:
+    description: Maximize Build Space for Bigger Projects Unit tests based on files and blocks
+    required: false
+    default: "false"
+  SONAR_TOKEN:
+    description: Sonarcloud user token
+    required: true
+  GH_TOKEN:
+    description: Github user token for private repositories (defaults to github.token)
+    required: false
+  GIT_CHECKOUT_SHOW_PROGRESS:
+    description: Show git checkout progress
+    default: "false"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    # Hack: Maximize Disk space for big & legacy projects (May become unsupported in future Azure runner releases)
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@v10
+      if: ${{ inputs.maximize_build_space == true }}
+      with:
+        root-reserve-mb: 2048
+        temp-reserve-mb: 2048
+        swap-size-mb: 1024
+        remove-dotnet: "true"
+    # Shallow clones should be disabled for a better relevancy of analysis
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ inputs.GH_TOKEN || github.token }}
+        show-progress: ${{ inputs.GIT_CHECKOUT_SHOW_PROGRESS }}
+    # Setup JDK
+    - name: Set up JDK ${{ inputs.jdk_major_version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ inputs.jdk_major_version }}
+        distribution: ${{ inputs.jdk_distribution }}
+    # Setup Maven
+    - name: Set up Maven ${{ inputs.maven_version }}
+      uses: stCarolas/setup-maven@v5
+      with:
+        maven-version: ${{ inputs.maven_version }}
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
+    # Cache Maven Artifcats to boost up builds
+    - name: Cache Maven artifacts
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2-repository
+    # Perform Maven Analyse
+    - name: Build and analyse
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.GH_TOKEN || github.token }}  # Needed to get PR information, if any
+        SONAR_TOKEN: ${{ inputs.SONAR_TOKEN }}
+        MAVEN_OPTS: ""
+      run: mvn -B test org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Pcoverage -Dstyle.color=always -Dmaven.artifact.threads=20 ${{ inputs.extra_maven_opts }}
+branding:
+  icon: "activity"
+  color: "gray-dark"
