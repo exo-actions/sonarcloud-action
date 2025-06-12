@@ -17,7 +17,7 @@ jobs:
       - name: Sonarcloud Build
         uses: exo-actions/sonar-action@v1
         with:
-          maven_version: "3.9.9"
+          maven_version: "3.9.10"
           jdk_major_version: "21"
           jdk_distribution: "zulu"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
