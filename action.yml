@@ -58,7 +58,7 @@ runs:
         remove-dotnet: "true"
     # Shallow clones should be disabled for a better relevancy of analysis
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
         token: ${{ inputs.GH_TOKEN || github.token }}
